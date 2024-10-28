@@ -52,6 +52,17 @@ define Build/mt7622-gpt
 	rm $@.tmp
 endef
 
+define Device/smartrg_sdg-841-t6
+  DEVICE_VENDOR := Adtran
+  DEVICE_DTS_DIR := ../dts
+  DEVICE_PACKAGES := e2fsprogs f2fsck mkf2fs
+  IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata
+  DEVICE_MODEL := SDG-841-t6
+  DEVICE_DTS := mt7622-smartrg-SDG-841-t6
+  DEVICE_PACKAGES += kmod-mt7915e kmod-mt7915-firmware
+endef
+TARGET_DEVICES += smartrg_sdg-841-t6
+
 define Device/bananapi_bpi-r64
   DEVICE_VENDOR := Bananapi
   DEVICE_MODEL := BPi-R64
@@ -325,6 +336,23 @@ define Device/totolink_a8000ru
   IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata
 endef
 TARGET_DEVICES += totolink_a8000ru
+
+define Device/tplink_tl-xdr3230-v1
+  DEVICE_VENDOR := TP-Link
+  DEVICE_MODEL := TL-XDR3230
+  DEVICE_VARIANT := v1
+  DEVICE_DTS := mt7622-tplink_tl-xdr3230-v1
+  DEVICE_DTS_DIR := ../dts
+  DEVICE_PACKAGES := kmod-mt7915-firmware swconfig
+  KERNEL := kernel-bin | lzma
+  KERNEL_INITRAMFS_SUFFIX := -recovery.itb
+  KERNEL_INITRAMFS := kernel-bin | lzma | \
+	fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb with-initrd | pad-to 64k
+  IMAGES := sysupgrade.itb
+  IMAGE/sysupgrade.itb := append-kernel | \
+	fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb external-static-with-rootfs | pad-rootfs | append-metadata
+endef
+TARGET_DEVICES += tplink_tl-xdr3230-v1
 
 define Device/ubnt_unifi-6-lr-v1
   DEVICE_VENDOR := Ubiquiti

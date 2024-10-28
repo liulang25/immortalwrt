@@ -8,6 +8,7 @@ platform_do_upgrade() {
 	case "$board" in
 	bananapi,bpi-r64|\
 	linksys,e8450-ubi|\
+	tplink,tl-xdr3230-v1|\
 	ubnt,unifi-6-lr-v1-ubootmod|\
 	ubnt,unifi-6-lr-v2-ubootmod|\
 	ubnt,unifi-6-lr-v3-ubootmod|\
@@ -43,6 +44,11 @@ platform_do_upgrade() {
 		fi
 		default_do_upgrade "$1"
 		;;
+	smartrg,sdg-841-t6)
+		CI_KERNPART="boot"
+		CI_ROOTPART="res1"
+		emmc_do_upgrade "$1"
+		;;
 	*)
 		default_do_upgrade "$1"
 		;;
@@ -67,6 +73,7 @@ platform_check_image() {
 	elecom,wrc-x3200gst3|\
 	mediatek,mt7622-rfb1-ubi|\
 	netgear,wax206|\
+	smartrg,sdg-841-t6|\
 	totolink,a8000ru)
 		nand_do_platform_check "$board" "$1"
 		return $?
@@ -89,6 +96,9 @@ platform_copy_config() {
 		if [ "$CI_METHOD" = "emmc" ]; then
 			emmc_copy_config
 		fi
+		;;
+	smartrg,sdg-841-t6)
+		emmc_copy_config
 		;;
 	esac
 }

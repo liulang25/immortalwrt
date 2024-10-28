@@ -841,6 +841,7 @@ define Device/netgear_ex3700
   DEVICE_VENDOR := NETGEAR
   DEVICE_MODEL := EX3700/EX3800
   SUPPORTED_DEVICES += ex3700
+  DEFAULT := n
 endef
 TARGET_DEVICES += netgear_ex3700
 
@@ -853,6 +854,7 @@ define Device/netgear_ex6120
   DEVICE_PACKAGES := kmod-mt76x2
   DEVICE_VENDOR := NETGEAR
   DEVICE_MODEL := EX6120
+  DEFAULT := n
 endef
 TARGET_DEVICES += netgear_ex6120
 
@@ -865,6 +867,7 @@ define Device/netgear_ex6130
   DEVICE_PACKAGES := kmod-mt76x2
   DEVICE_VENDOR := NETGEAR
   DEVICE_MODEL := EX6130
+  DEFAULT := n
 endef
 TARGET_DEVICES += netgear_ex6130
 
@@ -1251,6 +1254,7 @@ define Device/tplink_archer-c5-v4
   DEVICE_VARIANT := v4
   DEVICE_PACKAGES := kmod-usb2 kmod-usb-ohci kmod-usb-ledtrig-usbport \
 	kmod-mt76x2 kmod-switch-rtl8367b
+  DEFAULT := n
 endef
 TARGET_DEVICES += tplink_archer-c5-v4
 
@@ -1303,7 +1307,7 @@ endef
 TARGET_DEVICES += tplink_ec220-g5-v2
 
 define Device/tplink_re200-v1
-  $(Device/tplink-v1)
+  $(Device/tplink-v1-okli)
   SOC := mt7620a
   DEVICE_MODEL := RE200
   DEVICE_VARIANT := v1
@@ -1315,7 +1319,7 @@ endef
 TARGET_DEVICES += tplink_re200-v1
 
 define Device/tplink_re210-v1
-  $(Device/tplink-v1)
+  $(Device/tplink-v1-okli)
   SOC := mt7620a
   DEVICE_MODEL := RE210
   DEVICE_VARIANT := v1
