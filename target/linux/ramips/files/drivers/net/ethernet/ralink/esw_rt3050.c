@@ -1396,7 +1396,7 @@ static int esw_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	esw->dev = &pdev->dev;
-	esw->irq = irq_of_parse_and_map(np, 0);
+	esw->irq = platform_get_irq(pdev, 0);
 	esw->base = devm_platform_ioremap_resource(pdev, 0);
 	if (IS_ERR(esw->base))
 		return PTR_ERR(esw->base);
@@ -1525,7 +1525,6 @@ static struct platform_driver esw_driver = {
 	.remove = esw_remove,
 	.driver = {
 		.name = "rt3050-esw",
-		.owner = THIS_MODULE,
 		.of_match_table = ralink_esw_match,
 	},
 };
