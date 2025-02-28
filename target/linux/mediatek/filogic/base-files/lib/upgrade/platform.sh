@@ -72,8 +72,9 @@ platform_do_upgrade() {
 	bananapi,bpi-r4|\
 	bananapi,bpi-r4-poe|\
 	cetron,ct3003-ubootmod|\
-	cmcc,a10|\
+	cmcc,a10-ubootmod|\
 	cmcc,rax3000m|\
+	cudy,tr3000-v1-ubootmod|\
 	gatonetworks,gdsp|\
 	h3c,magic-nx30-pro|\
 	imou,lc-hx3001|\
