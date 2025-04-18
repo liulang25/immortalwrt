@@ -322,6 +322,15 @@ define Device/hiwifi_hc5861b
 endef
 TARGET_DEVICES += hiwifi_hc5861b
 
+define Device/huasifei_shf283
+   IMAGE_SIZE := 16064k
+   DEVICE_VENDOR := Huasifei
+   DEVICE_MODEL := SHF283
+   DEVICE_PACKAGES := kmod-usb2 kmod-usb-ohci kmod-usb-net-cdc-mbim \
+	kmod-usb-net-qmi-wwan kmod-usb-net-rndis kmod-usb-serial-option uqmi
+endef
+TARGET_DEVICES += huasifei_shf283
+
 define Device/iptime_a3
   IMAGE_SIZE := 7936k
   UIMAGE_NAME := a3
@@ -488,6 +497,20 @@ define Device/mercury_mac1200r-v2
   SUPPORTED_DEVICES += mac1200rv2
 endef
 TARGET_DEVICES += mercury_mac1200r-v2
+
+define Device/mercusys_mb130-4g-v1
+$(Device/tplink-v2)
+  IMAGE_SIZE := 14912k
+  DEVICE_VENDOR := MERCUSYS
+  DEVICE_MODEL := MB130-4G
+  DEVICE_VARIANT := v1
+  DEVICE_PACKAGES := kmod-mt76x0e kmod-usb2 kmod-mt7663-firmware-ap kmod-mt7615e \
+                     kmod-usb-serial-option kmod-usb-net-cdc-ether
+  TPLINK_FLASHLAYOUT := 16MLmtk
+  IMAGES := sysupgrade.bin tftp-recovery.bin
+  IMAGE/tftp-recovery.bin := pad-extra 128k | $$(IMAGE/factory.bin)
+endef
+TARGET_DEVICES += mercusys_mb130-4g-v1
 
 define Device/minew_g1-c
   IMAGE_SIZE := 15744k
