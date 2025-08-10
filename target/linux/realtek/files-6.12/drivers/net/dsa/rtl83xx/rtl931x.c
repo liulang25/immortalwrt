@@ -179,9 +179,9 @@ static void rtl931x_stp_set(struct rtl838x_switch_priv *priv, u16 msti, u32 port
 	priv->r->exec_tbl0_cmd(cmd);
 }
 
-inline static int rtl931x_trk_mbr_ctr(int group)
+inline static int rtldsa_931x_trk_mbr_ctr(int group)
 {
-	return RTL931X_TRK_MBR_CTRL + (group << 2);
+	return RTL931X_TRK_MBR_CTRL + (group << 3);
 }
 
 static void rtl931x_vlan_tables_read(u32 vlan, struct rtl838x_vlan_info *info)
@@ -204,9 +204,8 @@ static void rtl931x_vlan_tables_read(u32 vlan, struct rtl838x_vlan_info *info)
 	info->hash_uc_fid = !!(x & BIT(31));
 	info->hash_mc_fid = !!(x & BIT(30));
 	info->if_id = (x >> 20) & 0x3ff;
-	info->profile_id = (x >> 16) & 0xf;
 	info->multicast_grp_mask = x & 0xffff;
-	if (x & BIT(31))
+	if (y & BIT(31))
 		info->l2_tunnel_list_id = y >> 18;
 	else
 		info->l2_tunnel_list_id = -1;
@@ -217,21 +216,19 @@ static void rtl931x_vlan_tables_read(u32 vlan, struct rtl838x_vlan_info *info)
 	/* Read UNTAG table via table register 3 */
 	r = rtl_table_get(RTL9310_TBL_3, 0);
 	rtl_table_read(r, vlan);
-	v = ((u64)sw_r32(rtl_table_data(r, 0))) << 25;
-	v |= sw_r32(rtl_table_data(r, 1)) >> 7;
-	rtl_table_release(r);
+	info->untagged_ports = ((u64)sw_r32(rtl_table_data(r, 0))) << 25;
+	info->untagged_ports |= sw_r32(rtl_table_data(r, 1)) >> 7;
 
-	info->untagged_ports = v;
+	rtl_table_release(r);
 }
 
 static void rtl931x_vlan_set_tagged(u32 vlan, struct rtl838x_vlan_info *info)
 {
+	struct table_reg *r;
 	u32 v, w, x, y;
-	/* Access VLAN table (1) via register 0 */
-	struct table_reg *r = rtl_table_get(RTL9310_TBL_0, 3);
 
 	v = info->tagged_ports >> 25;
-	w = (info->tagged_ports & 0x1fffff) << 7;
+	w = (info->tagged_ports & GENMASK(24, 0)) << 7;
 	w |= info->fid & 0x7f;
 	x = info->hash_uc_fid ? BIT(31) : 0;
 	x |= info->hash_mc_fid ? BIT(30) : 0;
@@ -245,6 +242,7 @@ static void rtl931x_vlan_set_tagged(u32 vlan, struct rtl838x_vlan_info *info)
 		y = 0;
 	}
 
+	r = rtl_table_get(RTL9310_TBL_0, 3);
 	sw_w32(v, rtl_table_data(r, 0));
 	sw_w32(w, rtl_table_data(r, 1));
 	sw_w32(x, rtl_table_data(r, 2));
@@ -464,12 +462,14 @@ int rtl931x_write_mmd_phy(u32 port, u32 devnum, u32 regnum, u32 val)
 
 void rtl931x_print_matrix(void)
 {
-	volatile u64 *ptr = RTL838X_SW_BASE + RTL839X_PORT_ISO_CTRL(0);
+	struct table_reg *r = rtl_table_get(RTL9310_TBL_2, 1);
 
-	for (int i = 0; i < 52; i += 4)
-		pr_debug("> %16llx %16llx %16llx %16llx\n",
-			ptr[i + 0], ptr[i + 1], ptr[i + 2], ptr[i + 3]);
-	pr_debug("CPU_PORT> %16llx\n", ptr[52]);
+	for (int i = 0; i < 64; i++) {
+		rtl_table_read(r, i);
+		pr_info("> %08x %08x\n", sw_r32(rtl_table_data(r, 0)),
+			sw_r32(rtl_table_data(r, 1)));
+	}
+	rtl_table_release(r);
 }
 
 void rtl931x_set_receive_management_action(int port, rma_ctrl_t type, action_type_t action)
@@ -530,13 +530,15 @@ void rtl931x_set_receive_management_action(int port, rma_ctrl_t type, action_typ
 
 static u64 rtl931x_traffic_get(int source)
 {
-	u32 v;
-	struct table_reg *r = rtl_table_get(RTL9310_TBL_0, 6);
+	u64 v;
+	struct table_reg *r = rtl_table_get(RTL9310_TBL_2, 1);
 
 	rtl_table_read(r, source);
 	v = sw_r32(rtl_table_data(r, 0));
+	v <<= 32;
+	v |= sw_r32(rtl_table_data(r, 1));
+	v >>= 7;
 	rtl_table_release(r);
-	v = v >> 3;
 
 	return v;
 }
@@ -544,27 +546,28 @@ static u64 rtl931x_traffic_get(int source)
 /* Enable traffic between a source port and a destination port matrix */
 static void rtl931x_traffic_set(int source, u64 dest_matrix)
 {
-	struct table_reg *r = rtl_table_get(RTL9310_TBL_0, 6);
+	struct table_reg *r = rtl_table_get(RTL9310_TBL_2, 1);
 
-	sw_w32((dest_matrix << 3), rtl_table_data(r, 0));
+	sw_w32(dest_matrix >> (32 - 7), rtl_table_data(r, 0));
+	sw_w32(dest_matrix << 7, rtl_table_data(r, 1));
 	rtl_table_write(r, source);
 	rtl_table_release(r);
 }
 
 static void rtl931x_traffic_enable(int source, int dest)
 {
-	struct table_reg *r = rtl_table_get(RTL9310_TBL_0, 6);
+	struct table_reg *r = rtl_table_get(RTL9310_TBL_2, 1);
 	rtl_table_read(r, source);
-	sw_w32_mask(0, BIT(dest + 3), rtl_table_data(r, 0));
+	sw_w32_mask(0, BIT((dest + 7) % 32), rtl_table_data(r, (dest + 7) / 32 ? 0 : 1));
 	rtl_table_write(r, source);
 	rtl_table_release(r);
 }
 
 static void rtl931x_traffic_disable(int source, int dest)
 {
-	struct table_reg *r = rtl_table_get(RTL9310_TBL_0, 6);
+	struct table_reg *r = rtl_table_get(RTL9310_TBL_2, 1);
 	rtl_table_read(r, source);
-	sw_w32_mask(BIT(dest + 3), 0, rtl_table_data(r, 0));
+	sw_w32_mask(BIT((dest + 7) % 32), 0, rtl_table_data(r, (dest + 7) / 32 ? 0 : 1));
 	rtl_table_write(r, source);
 	rtl_table_release(r);
 }
@@ -1636,7 +1639,7 @@ const struct rtl838x_reg rtl931x_reg = {
 	.l2_ctrl_1 = RTL931X_L2_AGE_CTRL,
 	.l2_port_aging_out = RTL931X_L2_PORT_AGE_CTRL,
 	.set_ageing_time = rtl931x_set_ageing_time,
-	/* .smi_poll_ctrl does not exist */
+	.smi_poll_ctrl = RTL931X_SMI_PORT_POLLING_CTRL,
 	.l2_tbl_flush_ctrl = RTL931X_L2_TBL_FLUSH_CTRL,
 	.exec_tbl0_cmd = rtl931x_exec_tbl0_cmd,
 	.exec_tbl1_cmd = rtl931x_exec_tbl1_cmd,
@@ -1672,7 +1675,7 @@ const struct rtl838x_reg rtl931x_reg = {
 	.vlan_port_keep_tag_set = rtl931x_vlan_port_keep_tag_set,
 	.vlan_port_pvidmode_set = rtl931x_vlan_port_pvidmode_set,
 	.vlan_port_pvid_set = rtl931x_vlan_port_pvid_set,
-	.trk_mbr_ctr = rtl931x_trk_mbr_ctr,
+	.trk_mbr_ctr = rtldsa_931x_trk_mbr_ctr,
 	.set_vlan_igr_filter = rtl931x_set_igr_filter,
 	.set_vlan_egr_filter = rtl931x_set_egr_filter,
 	.set_distribution_algorithm = rtl931x_set_distribution_algorithm,
