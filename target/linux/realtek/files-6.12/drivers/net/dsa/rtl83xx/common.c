@@ -29,8 +29,6 @@ extern const struct dsa_switch_ops rtl930x_switch_ops;
 extern const struct phylink_pcs_ops rtl83xx_pcs_ops;
 extern const struct phylink_pcs_ops rtl93xx_pcs_ops;
 
-DEFINE_MUTEX(smi_lock);
-
 int rtl83xx_port_get_stp_state(struct rtl838x_switch_priv *priv, int port)
 {
 	u32 msti = 0;
@@ -1457,6 +1455,45 @@ static int rtl83xx_fib_event(struct notifier_block *this, unsigned long event, v
 	return NOTIFY_DONE;
 }
 
+/*
+ * TODO: This check is usually built into the DSA initialization functions. After carving
+ * out the mdio driver from the ethernet driver, there are two drivers that must be loaded
+ * before the DSA setup can start. This driver has severe issues with handling of deferred
+ * probing. For now provide this function for early dependency checks.
+ */
+static int rtldsa_ethernet_loaded(struct platform_device *pdev)
+{
+	struct device_node *dn = pdev->dev.of_node;
+	struct device_node *ports, *port;
+	int ret = -EPROBE_DEFER;
+
+	ports = of_get_child_by_name(dn, "ports");
+	if (!ports)
+		return -ENODEV;
+
+	for_each_child_of_node(ports, port) {
+		struct device_node *eth_np;
+		struct platform_device *eth_pdev;
+
+		eth_np = of_parse_phandle(port, "ethernet", 0);
+		if (!eth_np)
+			continue;
+
+		eth_pdev = of_find_device_by_node(eth_np);
+		of_node_put(eth_np);
+
+		if (!eth_pdev)
+			continue;
+
+		if (eth_pdev->dev.driver)
+			ret = 0;
+	}
+
+	of_node_put(ports);
+
+	return ret;	
+}
+
 static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 {
 	int i, err = 0;
@@ -1469,6 +1506,10 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 		dev_err(dev, "No DT found\n");
 		return -EINVAL;
 	}
+	
+	err = rtldsa_ethernet_loaded(pdev);
+	if (err)
+		return err;
 
 	/* Initialize access to RTL switch tables */
 	rtl_table_init();
