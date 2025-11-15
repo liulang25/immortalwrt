@@ -5,9 +5,9 @@
 include $(TOPDIR)/rules.mk
 include $(INCLUDE_DIR)/kernel.mk
 
-PKG_VERSION:=2025.07
+PKG_VERSION:=2025.10
 PKG_RELEASE:=1
-PKG_HASH:=0f933f6c5a426895bf306e93e6ac53c60870e4b54cda56d95211bec99e63bec7
+PKG_HASH:=b4f032848e56cc8f213ad59f9132c084dbbb632bc29176d024e58220e0efdf4a
 
 PKG_MAINTAINER:=Sarah Maedel <openwrt@tbspace.de>
 
@@ -243,6 +243,13 @@ define U-Boot/fastrhino-r68s-rk3568
     lunzn_fastrhino-r68s
 endef
 
+define U-Boot/generic-rk3568
+  $(U-Boot/rk3568/Default)
+  NAME:=Generic RK3566/RK3568 board
+  BUILD_DEVICES:= \
+    linkease_easepi-r1
+endef
+
 define U-Boot/lyt-t68m-rk3568
   $(U-Boot/rk3568/Default)
   NAME:=LYT T68M
@@ -276,6 +283,13 @@ define U-Boot/nanopi-r5s-rk3568
   NAME:=NanoPi R5S
   BUILD_DEVICES:= \
     friendlyarm_nanopi-r5s
+endef
+
+define U-Boot/x3568-v4-rk3568
+  $(U-Boot/rk3568/Default)
+  NAME:=NineTripod X3568 v4
+  BUILD_DEVICES:= \
+    ninetripod_x3568-v4
 endef
 
 define U-Boot/photonicat-rk3568
@@ -320,6 +334,36 @@ define U-Boot/sige3-rk3568
   NAME:=Sige3
   BUILD_DEVICES:= \
     armsom_sige3
+endef
+
+define U-Boot/xiguapi-v3-rk3568
+  $(U-Boot/rk3568/Default)
+  NAME:=XiGuaPi V3
+  BUILD_DEVICES:= \
+    nlnet_xiguapi-v3
+endef
+
+# RK3576 boards
+
+define U-Boot/rk3576/Default
+  BUILD_SUBTARGET:=armv8
+  DEPENDS:=+PACKAGE_u-boot-$(1):trusted-firmware-a-rk3576
+  ATF:=$(RK3576_ATF)
+  TPL:=$(RK3576_TPL)
+endef
+
+define U-Boot/generic-rk3576
+  $(U-Boot/rk3576/Default)
+  NAME:=Generic RK3576
+  BUILD_DEVICES:= \
+    friendlyarm_nanopi-r76s
+endef
+
+define U-Boot/rock-4d-rk3576
+  $(U-Boot/rk3576/Default)
+  NAME:=ROCK 4D
+  BUILD_DEVICES:= \
+    radxa_rock-4d
 endef
 
 
@@ -446,17 +490,22 @@ UBOOT_TARGETS := \
   bpi-r2-pro-rk3568 \
   fastrhino-r66s-rk3568 \
   fastrhino-r68s-rk3568 \
+  generic-rk3568 \
   lyt-t68m-rk3568 \
   mmbox-anas3035-rk3568 \
   mrkaio-m68s-rk3568 \
   nanopi-r5c-rk3568 \
   nanopi-r5s-rk3568 \
   photonicat-rk3568 \
+  x3568-v4-rk3568 \
+  xiguapi-v3-rk3568 \
   radxa-e25-rk3568 \
   roc-pc-rk3568 \
   rock-3a-rk3568 \
   rock-3b-rk3568 \
   sige3-rk3568 \
+  generic-rk3576 \
+  rock-4d-rk3576 \
   cyber3588-aib-rk3588 \
   nanopc-t6-rk3588 \
   generic-rk3588 \

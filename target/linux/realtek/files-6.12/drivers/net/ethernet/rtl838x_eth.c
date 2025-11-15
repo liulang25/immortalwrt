@@ -131,7 +131,10 @@ static void rtl839x_create_tx_header(struct p_hdr *h, unsigned int dest_port, in
 static void rtl930x_create_tx_header(struct p_hdr *h, unsigned int dest_port, int prio)
 {
 	h->cpu_tag[0] = 0x8000;  /* CPU tag marker */
-	h->cpu_tag[1] = 0x0200; /* Set FWD_TYPE to LOGICAL (2) */
+
+	h->cpu_tag[1] = FIELD_PREP(RTL93XX_CPU_TAG1_FWD_MASK,
+				   RTL93XX_CPU_TAG1_FWD_LOGICAL);
+	h->cpu_tag[1] |= FIELD_PREP(RTL93XX_CPU_TAG1_IGNORE_STP_MASK, 1);
 	h->cpu_tag[2] = 0;
 	h->cpu_tag[3] = 0;
 	h->cpu_tag[4] = 0;
@@ -147,7 +150,10 @@ static void rtl930x_create_tx_header(struct p_hdr *h, unsigned int dest_port, in
 static void rtl931x_create_tx_header(struct p_hdr *h, unsigned int dest_port, int prio)
 {
 	h->cpu_tag[0] = 0x8000;  /* CPU tag marker */
-	h->cpu_tag[1] = 0x0200; /* Set FWD_TYPE to LOGICAL (2) */
+
+	h->cpu_tag[1] = FIELD_PREP(RTL93XX_CPU_TAG1_FWD_MASK,
+				   RTL93XX_CPU_TAG1_FWD_LOGICAL);
+	h->cpu_tag[1] |= FIELD_PREP(RTL93XX_CPU_TAG1_IGNORE_STP_MASK, 1);
 	h->cpu_tag[2] = 0;
 	h->cpu_tag[3] = 0;
 	h->cpu_tag[4] = h->cpu_tag[5] = h->cpu_tag[6] = h->cpu_tag[7] = 0;
@@ -1159,7 +1165,6 @@ static int rtl838x_hw_receive(struct net_device *dev, int r, int budget)
 {
 	struct rtl838x_eth_priv *priv = netdev_priv(dev);
 	struct ring_b *ring = priv->membase;
-	LIST_HEAD(rx_list);
 	unsigned long flags;
 	int work_done = 0;
 	u32	*last;
@@ -1173,7 +1178,6 @@ static int rtl838x_hw_receive(struct net_device *dev, int r, int budget)
 		struct sk_buff *skb;
 		struct dsa_tag tag;
 		struct p_hdr *h;
-		u8 *skb_data;
 		u8 *data;
 		int len;
 
@@ -1197,9 +1201,7 @@ static int rtl838x_hw_receive(struct net_device *dev, int r, int budget)
 		if (dsa)
 			len += 4;
 
-		skb = netdev_alloc_skb(dev, len + 4);
-		skb_reserve(skb, NET_IP_ALIGN);
-
+		skb = netdev_alloc_skb_ip_align(dev, len);
 		if (likely(skb)) {
 			/* BUG: Prevent bug on RTL838x SoCs */
 			if (priv->family_id == RTL8380_FAMILY_ID) {
@@ -1213,10 +1215,9 @@ static int rtl838x_hw_receive(struct net_device *dev, int r, int budget)
 				}
 			}
 
-			skb_data = skb_put(skb, len);
 			/* Make sure data is visible */
 			mb();
-			memcpy(skb->data, (u8 *)KSEG1ADDR(data), len);
+			skb_put_data(skb, (u8 *)KSEG1ADDR(data), len);
 			/* Overwrite CRC with cpu_tag */
 			if (dsa) {
 				priv->r->decode_tag(h, &tag);
@@ -1242,7 +1243,7 @@ static int rtl838x_hw_receive(struct net_device *dev, int r, int budget)
 			dev->stats.rx_packets++;
 			dev->stats.rx_bytes += len;
 
-			list_add_tail(&skb->list, &rx_list);
+			napi_gro_receive(&priv->rx_qs[r].napi, skb);
 		} else {
 			if (net_ratelimit())
 				dev_warn(&dev->dev, "low on memory - packet dropped\n");
@@ -1260,8 +1261,6 @@ static int rtl838x_hw_receive(struct net_device *dev, int r, int budget)
 		ring->c_rx[r] = (ring->c_rx[r] + 1) % priv->rxringlen;
 		last = (u32 *)KSEG1ADDR(sw_r32(priv->r->dma_if_rx_cur + r * 4));
 	} while (&ring->rx_r[r][ring->c_rx[r]] != last && work_done < budget);
-
-	netif_receive_skb_list(&rx_list);
 
 	/* Update counters */
 	priv->r->update_cntr(r, work_done);
@@ -1525,9 +1524,6 @@ static int rtl931x_chip_init(struct rtl838x_eth_priv *priv)
 
 	/* Enable ESD auto recovery */
 	sw_w32(0x1, RTL931X_MDX_CTRL_RSVD);
-
-	/* Init SPI, is this for thermal control or what? */
-	sw_w32_mask(0x7 << 11, 0x2 << 11, RTL931X_SPI_CTRL0);
 
 	return 0;
 }

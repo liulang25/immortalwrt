@@ -12,17 +12,16 @@ PKG_RELEASE:=1
 
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL=$(PROJECT_GIT)/project/odhcp6c.git
-PKG_SOURCE_DATE:=2025-02-06
-PKG_SOURCE_VERSION:=8aa8b706727a6a6a841be42ef35a629ed635db3e
-PKG_MIRROR_HASH:=ea631af735b04d54e553a525b263b8b072917ff2f323eff3e68f1f6e1df53e08
+PKG_SOURCE_DATE:=2025-11-09
+PKG_SOURCE_VERSION:=e5690c1f13ed3605ece68d870abb3c4a2f09d571
+PKG_MIRROR_HASH:=4dbf3980f8ac72f92f68c5dbac7179c28aab0e012a53162e0defbbf5959a9389
 PKG_MAINTAINER:=Hans Dedecker <dedeckeh@gmail.com>
 PKG_LICENSE:=GPL-2.0
 
 include $(INCLUDE_DIR)/package.mk
 include $(INCLUDE_DIR)/cmake.mk
 
-CMAKE_OPTIONS += \
-	-DUSE_LIBUBOX=on
+CMAKE_OPTIONS += -DUBUS=1
 
 ifneq ($(CONFIG_PACKAGE_odhcp6c_ext_cer_id),0)
   CMAKE_OPTIONS += -DEXT_CER_ID=$(CONFIG_PACKAGE_odhcp6c_ext_cer_id)
@@ -32,7 +31,7 @@ define Package/odhcp6c
   SECTION:=net
   CATEGORY:=Network
   TITLE:=Embedded DHCPv6-client for OpenWrt
-  DEPENDS:=@IPV6 +libubox
+  DEPENDS:=@IPV6 +libubox +libubus
 endef
 
 define Package/odhcp6c/config

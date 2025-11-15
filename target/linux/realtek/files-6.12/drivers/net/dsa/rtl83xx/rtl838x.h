@@ -123,24 +123,6 @@
 #define RTL839X_MAC_LINK_STS			(0x0390)
 #define RTL930X_MAC_LINK_STS			(0xCB10)
 #define RTL931X_MAC_LINK_STS			(0x0EC0)
-#define RTL838X_MAC_LINK_SPD_STS(p)		(0xa190 + (((p >> 4) << 2)))
-#define RTL839X_MAC_LINK_SPD_STS(p)		(0x03a0 + (((p >> 4) << 2)))
-#define RTL930X_MAC_LINK_SPD_STS(p)		(0xCB18 + (((p >> 3) << 2)))
-#define RTL931X_MAC_LINK_SPD_STS		(0x0ED0)
-#define RTL838X_MAC_LINK_DUP_STS		(0xa19c)
-#define RTL839X_MAC_LINK_DUP_STS		(0x03b0)
-#define RTL930X_MAC_LINK_DUP_STS		(0xCB28)
-#define RTL931X_MAC_LINK_DUP_STS		(0x0EF0)
-#define RTL838X_MAC_TX_PAUSE_STS		(0xa1a0)
-#define RTL839X_MAC_TX_PAUSE_STS		(0x03b8)
-#define RTL930X_MAC_TX_PAUSE_STS		(0xCB2C)
-#define RTL931X_MAC_TX_PAUSE_STS		(0x0EF8)
-#define RTL838X_MAC_RX_PAUSE_STS		(0xa1a4)
-#define RTL839X_MAC_RX_PAUSE_STS		(0x03c0)
-#define RTL930X_MAC_RX_PAUSE_STS		(0xCB30)
-#define RTL931X_MAC_RX_PAUSE_STS		(0x0F00)
-#define RTL930X_MAC_LINK_MEDIA_STS		(0xCB14)
-#define RTL931X_MAC_LINK_MEDIA_STS		(0x0EC8)
 
 /* MAC link state bits */
 #define RTL_SPEED_10				0
@@ -424,6 +406,27 @@
 #define RTL839X_SPCL_TRAP_SWITCH_MAC_CTRL	(0x1068)
 #define RTL839X_SPCL_TRAP_SWITCH_IPV4_ADDR_CTRL	(0x106C)
 #define RTL839X_SPCL_TRAP_CRC_CTRL		(0x1070)
+
+#define RTL930X_BANDWIDTH_CTRL_EGRESS(port)	(0x7660 + (port * 16))
+#define RTL930X_BANDWIDTH_CTRL_INGRESS(port)	(0x8068 + (port * 4))
+#define RTL930X_BANDWIDTH_CTRL_MAX_BURST	(64 * 1000)
+#define RTL930X_BANDWIDTH_CTRL_INGRESS_BURST_HIGH_ON(port) \
+						(0x80DC + (port * 8))
+#define RTL930X_BANDWIDTH_CTRL_INGRESS_BURST_HIGH_OFF(port) \
+						(0x80E0 + (port * 8))
+#define RTL930X_BANDWIDTH_CTRL_INGRESS_BURST_MAX \
+						GENMASK(30, 0)
+
+#define RTL931X_BANDWIDTH_CTRL_EGRESS(port)	(0x2164 + (port * 8))
+#define RTL931X_BANDWIDTH_CTRL_INGRESS(port)	(0xe008 + (port * 8))
+
+#define RTL93XX_BANDWIDTH_CTRL_RATE_MAX		GENMASK(19, 0)
+#define RTL93XX_BANDWIDTH_CTRL_ENABLE		BIT(20)
+#define RTL931X_BANDWIDTH_CTRL_MAX_BURST	GENMASK(15, 0)
+
+#define RTL930X_INGRESS_FC_CTRL(port)		(0x81CC + ((port / 29) * 4))
+#define RTL930X_INGRESS_FC_CTRL_EN(port)	BIT(port % 29)
+
 /* special port action controls */
 /* values:
  *      0 = FORWARD (default)
@@ -600,6 +603,17 @@ typedef enum {
 #define RTL931X_LED_PORT_FIB_MASK_CTRL		(0x065c)
 #define RTL931X_LED_PORT_COMBO_MASK_CTRL	(0x0664)
 
+#define RTL931X_LED_GLB_ACTIVE_LOW BIT(21)
+
+#define RTL931X_LED_SETX_0_CTRL(x) (RTL931X_LED_SET0_0_CTRL - (x * 8))
+#define RTL931X_LED_SETX_1_CTRL(x) (RTL931X_LED_SETX_0_CTRL(x) - 4)
+
+/* get register for given set and led in the set */
+#define RTL931X_LED_SETX_LEDY(x,y) (RTL931X_LED_SETX_0_CTRL(x) - 4 * (y / 2))
+
+/* get shift for given led in any set */
+#define RTL931X_LED_SET_LEDX_SHIFT(x) (16 * (x % 2))
+
 #define MAX_VLANS 4096
 #define MAX_LAGS 16
 #define MAX_PRIOS 8
@@ -627,7 +641,6 @@ enum phy_type {
 	PHY_RTL8218B_EXT = 3,
 	PHY_RTL8214FC = 4,
 	PHY_RTL839X_SDS = 5,
-	PHY_RTL930X_SDS = 6,
 };
 
 enum pbvlan_type {
@@ -687,25 +700,21 @@ struct rtldsa_counter_state {
 };
 
 struct rtl838x_port {
-	bool enable;
+	bool enable:1;
+	bool phy_is_integrated:1;
+	bool is10G:1;
+	bool is2G5:1;
+	bool isolated:1;
+	bool rate_police_egress:1;
+	bool rate_police_ingress:1;
 	u64 pm;
 	u16 pvid;
 	bool eee_enabled;
 	enum phy_type phy;
-	bool phy_is_integrated;
-	bool is10G;
-	bool is2G5;
-	int sds_num;
 	int led_set;
 	int leds_on_this_port;
 	struct rtldsa_counter_state counters;
 	const struct dsa_port *dp;
-};
-
-struct rtl838x_pcs {
-	struct phylink_pcs pcs;
-	struct rtl838x_switch_priv *priv;
-	int port;
 };
 
 struct rtl838x_vlan_info {
@@ -735,32 +744,33 @@ struct rtl838x_l2_entry {
 	u16 vid;
 	u16 rvid;
 	u8 port;
-	bool valid;
 	enum l2_entry_type type;
-	bool is_static;
-	bool is_ip_mc;
-	bool is_ipv6_mc;
-	bool block_da;
-	bool block_sa;
-	bool suspended;
-	bool next_hop;
+	bool valid:1;
+	bool is_static:1;
+	bool is_ip_mc:1;
+	bool is_ipv6_mc:1;
+	bool block_da:1;
+	bool block_sa:1;
+	bool suspended:1;
+	bool next_hop:1;
+	bool is_trunk:1;
+	bool nh_vlan_target:1;  /* Only RTL83xx: VLAN used for next hop */
 	int age;
 	u8 trunk;
-	bool is_trunk;
 	u8 stack_dev;
 	u16 mc_portmask_index;
 	u32 mc_gip;
 	u32 mc_sip;
 	u16 mc_mac_index;
 	u16 nh_route_id;
-	bool nh_vlan_target;  /* Only RTL83xx: VLAN used for next hop */
 
 	/* The following is only valid on RTL931x */
-	bool is_open_flow;
-	bool is_pe_forward;
-	bool is_local_forward;
-	bool is_remote_forward;
-	bool is_l2_tunnel;
+	bool is_open_flow:1;
+	bool is_pe_forward:1;
+	bool is_local_forward:1;
+	bool is_remote_forward:1;
+	bool is_l2_tunnel:1;
+	bool hash_msb:1;
 	int l2_tunnel_id;
 	int l2_tunnel_list_id;
 };
@@ -1020,6 +1030,23 @@ struct rtl83xx_route {
 	struct rtl93xx_route_attr attr;
 };
 
+/**
+ * struct rtldsa_mirror_config - Mirror configuration for specific group and port
+ */
+struct rtldsa_mirror_config {
+	/** @ctrl: control register for mirroring group */
+	int ctrl;
+
+	/** @spm: register for the destination port members */
+	int spm;
+
+	/** @dpm: register for the source port members */
+	int dpm;
+
+	/** @val: @ctrl register settings to enable mirroring */
+	u32 val;
+};
+
 struct rtl838x_reg {
 	void (*mask_port_reg_be)(u64 clear, u64 set, int reg);
 	void (*set_port_reg_be)(u64 set, int reg);
@@ -1035,7 +1062,6 @@ struct rtl838x_reg {
 	void (*traffic_enable)(int source, int dest);
 	void (*traffic_disable)(int source, int dest);
 	void (*traffic_set)(int source, u64 dest_matrix);
-	u64 (*traffic_get)(int source);
 	int l2_ctrl_0;
 	int l2_ctrl_1;
 	int smi_poll_ctrl;
@@ -1070,14 +1096,11 @@ struct rtl838x_reg {
 	int  (*l2_port_new_salrn)(int port);
 	int  (*l2_port_new_sa_fwd)(int port);
 	int (*set_ageing_time)(unsigned long msec);
-	int mir_ctrl;
-	int mir_dpm;
-	int mir_spm;
-	int mac_link_sts;
-	int mac_link_dup_sts;
-	int  (*mac_link_spd_sts)(int port);
-	int mac_rx_pause_sts;
-	int mac_tx_pause_sts;
+	int (*get_mirror_config)(struct rtldsa_mirror_config *config, int group, int port);
+	int (*port_rate_police_add)(struct dsa_switch *ds, int port,
+				    const struct flow_action_entry *act, bool ingress);
+	int (*port_rate_police_del)(struct dsa_switch *ds, int port, struct flow_cls_offload *cls,
+				    bool ingress);
 	u64 (*read_l2_entry_using_hash)(u32 hash, u32 position, struct rtl838x_l2_entry *e);
 	void (*write_l2_entry_using_hash)(u32 hash, u32 pos, struct rtl838x_l2_entry *e);
 	u64 (*read_cam)(int idx, struct rtl838x_l2_entry *e);
@@ -1126,7 +1149,7 @@ struct rtl838x_switch_priv {
 	u16 family_id;
 	char version;
 	struct rtl838x_port ports[57];
-	struct rtl838x_pcs pcs[57];
+	struct phylink_pcs *pcs[57];
 	struct mutex reg_mutex;		/* Mutex for individual register manipulations */
 	struct mutex pie_mutex;		/* Mutex for Packet Inspection Engine */
 	int link_state_irq;
@@ -1141,14 +1164,24 @@ struct rtl838x_switch_priv {
 	u32 fib_entries;
 	int l2_bucket_size;
 	struct dentry *dbgfs_dir;
-	int n_lags;
+
+	/** @lags_port_members: Port (bit) is part of a specific LAG */
 	u64 lags_port_members[MAX_LAGS];
-	struct net_device *lag_devs[MAX_LAGS];
+
+	/** @lag_primary: port of a LAG is primary (repesenting) and is added to
+	 * the port matrix
+	 */
 	u32 lag_primary[MAX_LAGS];
-	u32 is_lagmember[57];
+
+	/**
+	 * @lag_non_primary: Port (bit) is part of any LAG but not the
+	 * first/primary port which needs to be added in the port matrix
+	 */
+	u64 lag_non_primary;
+
+	/** @lagmembers: Port (bit) is part of any LAG */
 	u64 lagmembers;
 	struct workqueue_struct *wq;
-	struct notifier_block nb;  /* TODO: change to different name */
 	struct notifier_block ne_nb;
 	struct notifier_block fib_nb;
 	bool eee_enabled;
